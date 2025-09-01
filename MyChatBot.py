@@ -1,0 +1,188 @@
+import nest_asyncio
+nest_asyncio.apply()
+
+import streamlit as st
+from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from PyPDF2 import PdfReader
+from langchain_community.vectorstores import FAISS
+from langchain.prompts import ChatPromptTemplate
+from langchain_community.utilities import WikipediaAPIWrapper
+from dotenv import load_dotenv
+from streamlit_lottie import st_lottie
+import requests
+import os
+
+# =========================
+# Load API Key
+# =========================
+load_dotenv()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("❌ GOOGLE_API_KEY not found in environment variables")
+os.environ["GOOGLE_API_KEY"] = GOOGLE_API_KEY
+
+# =========================
+# Wikipedia Wrapper
+# =========================
+wiki = WikipediaAPIWrapper()
+
+# =========================
+# Helper for Lottie Animations
+# =========================
+def load_lottie_url(url: str):
+    r = requests.get(url)
+    if r.status_code != 200:
+        return None
+    return r.json()
+
+# =========================
+# Custom Styling (CSS)
+# =========================
+st.markdown("""
+    <style>
+    .stApp {
+        background: linear-gradient(to right, #141e30, #243b55);
+        color: #ffffff;
+        font-family: 'Poppins', sans-serif;
+    }
+    h1, h2, h3 {
+        text-align: center;
+        font-weight: 600;
+        color: #f0f0f0;
+        text-shadow: 1px 1px 3px #000;
+    }
+    .chat-bubble {
+        padding: 12px;
+        margin: 8px 0;
+        border-radius: 12px;
+        max-width: 80%;
+    }
+    .user-bubble {
+        background-color: #4CAF50;
+        color: white;
+        margin-left: auto;
+        text-align: right;
+    }
+    .bot-bubble {
+        background-color: #2a2a2a;
+        color: #f8f8f8;
+        margin-right: auto;
+        text-align: left;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# =========================
+# Header with Animation
+# =========================
+col1, col2 = st.columns([2, 5])
+with col1:
+    lottie_robot = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_jcikwtux.json")
+    if lottie_robot:
+        st_lottie(lottie_robot, height=150, width=150, key="robot")
+with col2:
+    st.header("🤖 RizzBot – Your AI Tutor")
+
+# =========================
+# Sidebar
+# =========================
+with st.sidebar:
+    st.title("📚 My Notes")
+    file = st.file_uploader("Upload your notes PDF and start asking questions", type="pdf")
+    st.markdown("---")
+    st.markdown("✨ Pro tip: Upload clear text-based PDFs for best results.")
+    st.markdown("💡 Try asking: *What are the key concepts in chapter 2?*")
+
+# =========================
+# Extracting PDF Text
+# =========================
+if file is not None:
+    try:
+        my_pdf = PdfReader(file)
+        text = ""
+        for page in my_pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+
+        if not text:
+            st.warning("⚠️ Could not extract any text from the PDF. It might be scanned images.")
+            st.stop()
+
+        # Break into chunks
+        splitter = RecursiveCharacterTextSplitter(
+            separators=["\n"], chunk_size=1000, chunk_overlap=100
+        )
+        chunks = splitter.split_text(text)
+
+        # Embeddings
+        embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+        vector_store = FAISS.from_texts(chunks, embeddings)
+
+        # User Input
+        user_query = st.text_input("💬 Ask me anything about your notes:")
+
+        if user_query:
+            with st.spinner("🤔 Thinking..."):
+                # Search in PDF notes
+                matching_chunks = vector_store.similarity_search(user_query, k=3)
+
+                llm = ChatGoogleGenerativeAI(
+                    model="gemini-1.5-flash",
+                    temperature=0.1
+                )
+
+                customized_prompt = ChatPromptTemplate.from_template(
+                    """You are my assistant tutor. Answer the question based on the following context. 
+                    If you did not get the context simply say "No notes context":
+
+                    Context:
+                    {context}
+
+                    Question: {input}
+
+                    Answer: """
+                )
+
+                chain = create_stuff_documents_chain(llm, customized_prompt)
+                output = chain.invoke({"input": user_query, "context": matching_chunks})
+
+                # Ensure string
+                if isinstance(output, dict):
+                    output = str(output.get("output_text", output))
+                else:
+                    output = str(output)
+
+                # If no notes context → Wikipedia fallback
+                if "No notes context" in output:
+                    wiki_result = wiki.run(user_query)
+                    if wiki_result:
+                        words = wiki_result.split()
+                        short_wiki_result = " ".join(words[:120]) + "..."
+
+                        # Add styled Wikipedia disclaimer
+                        disclaimer_html = """
+                        <div style="
+                            background-color:#FFD700; 
+                            color:#000; 
+                            padding:8px 12px; 
+                            border-radius:8px; 
+                            font-weight:bold; 
+                            margin-bottom:10px;
+                            text-align:center;">
+                            📖 I couldn’t find it in your notes, but here’s a short summary from Wikipedia:
+                        </div>
+                        """
+
+                        output = f"{disclaimer_html}<div>{short_wiki_result}</div>"
+
+                # Chat UI
+                st.markdown(f'<div class="chat-bubble user-bubble">{user_query}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="chat-bubble bot-bubble">{output}</div>', unsafe_allow_html=True)
+
+                st.success("✅ Response generated!")
+
+    except Exception as e:
+        st.error(f"❌ An error occurred: {e}")
