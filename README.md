@@ -40,7 +40,7 @@ Wikipedia API Wrapper
 dotenv
  – API key management
 
-🚀 How It Works
+🚀 How It Works ??
 
 Upload your PDF notes.
 
@@ -54,4 +54,3 @@ If no context → Fetch answer from Wikipedia and add a clear disclaimer.
 
 
 
-## 📂 Project Structure
