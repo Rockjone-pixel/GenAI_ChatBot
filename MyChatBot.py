@@ -6,6 +6,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from PyPDF2 import PdfReader
+from docx import Document
 from langchain_community.vectorstores import FAISS
 from langchain.prompts import ChatPromptTemplate
 from langchain_community.utilities import WikipediaAPIWrapper
@@ -90,25 +91,42 @@ with col2:
 # =========================
 with st.sidebar:
     st.title("📚 My Notes")
-    file = st.file_uploader("Upload your notes PDF and start asking questions", type="pdf")
+    file = st.file_uploader(
+        "Upload your notes (PDF, DOCX, or TXT)",
+        type=["pdf", "docx", "txt"]
+    )
     st.markdown("---")
-    st.markdown("✨ Pro tip: Upload clear text-based PDFs for best results.")
+    st.markdown("✨ Pro tip: Upload clear text-based files for best results.")
     st.markdown("💡 Try asking: *What are the key concepts in chapter 2?*")
 
 # =========================
-# Extracting PDF Text
+# Extracting Document Text
 # =========================
 if file is not None:
     try:
-        my_pdf = PdfReader(file)
         text = ""
-        for page in my_pdf.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text
 
-        if not text:
-            st.warning("⚠️ Could not extract any text from the PDF. It might be scanned images.")
+        # Handle PDF
+        if file.type == "application/pdf":
+            my_pdf = PdfReader(file)
+            for page in my_pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text
+
+        # Handle DOCX
+        elif file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            doc = Document(file)
+            for para in doc.paragraphs:
+                text += para.text + "\n"
+
+        # Handle TXT
+        elif file.type == "text/plain":
+            text = file.read().decode("utf-8")
+
+        # Safety check
+        if not text.strip():
+            st.warning("⚠️ Could not extract any text. File may be empty or unsupported.")
             st.stop()
 
         # Break into chunks
@@ -126,7 +144,7 @@ if file is not None:
 
         if user_query:
             with st.spinner("🤔 Thinking..."):
-                # Search in PDF notes
+                # Search in document notes
                 matching_chunks = vector_store.similarity_search(user_query, k=3)
 
                 llm = ChatGoogleGenerativeAI(
