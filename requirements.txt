@@ -1,12 +1,13 @@
 streamlit
+streamlit-lottie
 langchain
-langchain-google-genai
 langchain-community
 langchain-text-splitters
+langchain-google-genai
 PyPDF2
 python-docx
 faiss-cpu
 python-dotenv
-streamlit-lottie
 requests
+wikipedia
 nest_asyncio
