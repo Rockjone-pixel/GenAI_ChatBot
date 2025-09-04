@@ -39,38 +39,78 @@ def load_lottie_url(url: str):
     return r.json()
 
 # =========================
-# Custom Styling (CSS)
+# Custom Styling (CSS) - Mobile Responsive
 # =========================
 st.markdown("""
     <style>
+    /* 🌐 Base Styling */
     .stApp {
         background: linear-gradient(to right, #141e30, #243b55);
         color: #ffffff;
         font-family: 'Poppins', sans-serif;
+        padding: 10px;
     }
+
     h1, h2, h3 {
         text-align: center;
         font-weight: 600;
         color: #f0f0f0;
         text-shadow: 1px 1px 3px #000;
+        margin-bottom: 15px;
     }
+
+    /* 💬 Chat Bubbles */
     .chat-bubble {
         padding: 12px;
         margin: 8px 0;
         border-radius: 12px;
-        max-width: 80%;
+        max-width: 85%;
+        word-wrap: break-word;
+        font-size: 16px;
+        line-height: 1.4;
     }
+
     .user-bubble {
         background-color: #4CAF50;
         color: white;
         margin-left: auto;
         text-align: right;
     }
+
     .bot-bubble {
         background-color: #2a2a2a;
         color: #f8f8f8;
         margin-right: auto;
         text-align: left;
+    }
+
+    /* 📱 Tablet Screens */
+    @media (max-width: 768px) {
+        h1, h2, h3 {
+            font-size: 22px !important;
+        }
+        .chat-bubble {
+            font-size: 14px;
+            padding: 10px;
+            max-width: 95%;
+        }
+        .stMarkdown {
+            font-size: 14px !important;
+        }
+    }
+
+    /* 📱 Mobile Screens */
+    @media (max-width: 480px) {
+        h1, h2, h3 {
+            font-size: 18px !important;
+        }
+        .chat-bubble {
+            max-width: 100%;
+            font-size: 13px;
+        }
+        .stButton>button {
+            width: 100% !important;
+        }
     }
     </style>
 """, unsafe_allow_html=True)
@@ -78,13 +118,18 @@ st.markdown("""
 # =========================
 # Header with Animation
 # =========================
-col1, col2 = st.columns([2, 5])
+st.markdown("## 🤖 RizzBot – Your AI Tutor", unsafe_allow_html=True)
+
+# Detect screen size dynamically
+col1, col2 = st.columns([1, 3], gap="small")
 with col1:
     lottie_robot = load_lottie_url("https://assets10.lottiefiles.com/packages/lf20_jcikwtux.json")
     if lottie_robot:
-        st_lottie(lottie_robot, height=150, width=150, key="robot")
+        st_lottie(lottie_robot, height=120, key="robot")
 with col2:
-    st.header("🤖 RizzBot – Your AI Tutor")
+    st.write("")  # spacing
+    st.write("")  # spacing
+    st.subheader("Always here to help you learn 📚")
 
 # =========================
 # Sidebar
